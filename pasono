@@ -1,0 +1,142 @@
+
+
+//GET LIST OF DEVICE NEXT REPAYMENT DATES.
+select l.customer_number,l.account_number,product_name,next_repyment_date, 
+	   SUBSTRING(additional_info,11,15) imei
+	   from loan l inner join (select account_number from repayment where product_id
+	   in (3,8) and created_at >= '2023-07-27 10:00:00' and created_at <= '2023-07-28 10:00:00'
+	   group by account_number) r on r.account_number = l.account_number order by next_repyment_date asc;
+
+
+
+//SCRIPT FOR EXTRACTING/EXPORTING TRANSACTIONS .
+   mysql -utrainee -h127.0.0.1 -p'' -e "select customer_number where description = 'share with melk';" --database=xpawa_lmsdb | sed 's/\t/,/g' > processing_transaction.csv 
+
+
+   mysql -utrainee -h127.0.0.1 -p'' -e "select created_at,customer_number,loan_id,extension_amount from extension_application where status = 'ACCEPTED' and created_at  < '2023-08-11 10:20';" --database=xpawa_lmsdb | sed 's/\t/,/g' > extension_application.csv 
+
+
+
+   mysql -umgodiuat -p'L@E9p[Kc=~Ev2tQ+' -e "select *from template where service = 'DEVICE' and product_id=110;"--database=xpawa_communicationsdb | sed 's/\t/,/g' > insert_comms.csv
+
+
+   select account_number,created_at,external_transaction_id,product_name,repayment_cycle,transaction_id,status,amount from loan_application where status="PENDING" and product_code in (3,5) and date(created_at) = '2023-08-01' order by id desc;
+
+
+
+
+//LIST OF DEVICE WITH PROCESSING STATE
+select created_at,account_number,amount,external_transaction_id,product_code,partner_id,product_name,repayment_cycle,status from loan_application where status = 'PROCESSING'
+and product_code in (3,5) and date(created_at) = '2023-07-29';
+
+
+
+//LIST OF DEVICE WITH PROCESSING STATE
+ select created_at,account_number,amount,external_transaction_id,product_code,partner_id,product_name,repayment_cycle,status from loan_application where status = 'ACCEPTED'
+and product_code in (3,5) and date(created_at) = '2023-08-02';
+
+
+created_at,conversion_id,customer_id,description
+
+
+//UPDATE BLACKLISTED CUSTOMERS BASED ON PRODUCT STATAPACK
+update blacklisted_customers set status = 'INACTIVE', description = CONCAT(description, " Late repayment from Mpesa") where product_id = 4;
+
+
+//COUNTS NUMBER OF DEVICES BASED GROUP BY STATUS.
+select status,date(created_at) dates, count(*) from loan_application where product_id = 4 and date(created_at) > '2023-07-24' group by status,date(created_at);
+
+
+//CHECKING SAVINGS TRANSACTIONS
+ select created_at,external_transaction_id,transaction_id,status,product_code,product_id,partner_id,type from savings_transactions  where customer_number='100000000003497473'
+order by id desc limit 30;
+
+//CHECKING LOAN APPLICATIONS
+select account_number,created_at,external_transaction_id,product_name,repayment_cycle,transaction_id,status,amount from loan_application where 
+customer_number=100000002293530915 and product_code in (3,5) order by id desc;
+
+//CHECKING LOAN APPLICATIONS
+select account_number,created_at,external_transaction_id,product_name,repayment_cycle,transaction_id,status,amount from loan_application where status="ACCEPTED" and product_code in (3,5) and date(created_at) = '2023-08-03' order by id desc;
+
+select customer_number,account_number,created_at,external_transaction_id,product_name,repayment_cycle,transaction_id,status,amount from loan_application where status='ACCEPTED' and date(created_at) = '2023-08-06' order by id desc;
+
+
+//DOWNPAYMENT
+ select created_at,account_number,external_transaction_id,device_price,paid_amount,payment_date,product_name,status from downpayment where external_transaction_id='AGT3A9E6G5X';
+
+//DOWNPAYMENT WITH customer_number
+ select created_at,account_number,external_transaction_id,device_price,paid_amount,payment_date,product_name,status from downpayment where customer_number='100000002552192332';
+
+//LIST of DOWNPAYMENT
+select created_at,account_number,external_transaction_id,device_price,paid_amount,payment_date,product_name,status from downpayment ORDER BY ID desc limit 20;
+
+
+
+//CHANCE FILE FOR RECON.
+mysql -utrainee -h127.0.0.1 -p'' -e 
+"SELECT s.account_number,s.customer_number,st.amount,st.created_at,st.description,st.status,st.type 
+FROM savings_transactions st INNER JOIN savings s ON s.id=st.savings_id
+WHERE date(st.created_at)='2023-08-01'
+AND st.description = 'INTEREST_ACCRUED - Post Dunduliza' AND st.status='ACCEPTED';"
+ --database=mgodi_reportsdb | sed 's/\t/,/g' > savings_transaction_vs_account_transaction_for_recon_20230801.csv
+
+
+//ROLLOVER
+select created_at,account_number,balance_due,due_date,loan_id,rollover_date,rollover_fees,product_id from rollover where description = "Rollover = 1" order by id desc;
+
+
+
+mongo export .
+
+
+
+mongoexport --host=localhost --port=27017 --db=scoring_engine --collection=scores --type=csv --fields="createdDate,evaluationRequest.arguments.customerid,evaluationResponse.results.score,evaluationResponse.results.eligibleAmount,evaluationResponse.results.incomeProxyValue,evaluationResponse.results.exclusionReason,evaluationResponse.results.internalRiskGroup,evaluationResponse.results.ruleInternalScore,evaluationResponse.results.internalRiskGrade,evaluationResponse.results.flagStrategy,evaluationResponse.results.ruleHistoricalDelinquency,evaluationResponse.results.ruleCurrentDeliquency,evaluationResponse.results.exclusionReasonCode,evaluationResponse.results.incomeProxyBand,evaluationResponse.results.finalscore,evaluationResponse.results.ruleCustomerAge,evaluationResponse.results.ruleAgeonMpesa,evaluationResponse.results._target" --query="{ \"createdDate\": \"2023-08-09\" }" --sort='{ "_id": -1 }' --limit=189  --out="scoring_internal_final.csv"
+
+mongoexport --host=localhost --port=27017 --db=scoring_engine --collection=scores --type=csv --fields="createdDate,evaluationRequest.arguments.customerid,evaluationResponse.results.score,evaluationResponse.results.incomeProxyValue,evaluationResponse.results.eligibleAmount,evaluationResponse.results.exclusionReason,evaluationResponse.results.internalRiskGroup,evaluationResponse.results.ruleInternalScore,evaluationResponse.results.internalRiskGrade,evaluationResponse.results.flagStrategy,evaluationResponse.results.ruleHistoricalDelinquency,evaluationResponse.results.ruleCurrentDeliquency,evaluationResponse.results.exclusionReasonCode,evaluationResponse.results.incomeProxyBand,evaluationResponse.results.finalscore,evaluationResponse.results.ruleCustomerAge,evaluationResponse.results.ruleAgeonMpesa,evaluationResponse.results._target" --sort='{ "_id": -1 }' --out="scoring_internal_final.csv"
+
+
+
+mgodi export .
+
+mysql -umgodiuat -p'L@E9p[Kc=~Ev2tQ+' -e 'SELECT customer_id, score, eligible_amount, actual_eligibility_amount, exclusion_reason, income_proxy_value, status FROM scoring_results WHERE created_at > "2023-08-09 22:59" ORDER BY id DESC ;' --database=xpawa_kycdb | sed 's/\t/,/g' > customer_scoring.csv
+
+
+count .
+
+SELECT COUNT(*) AS result_count
+FROM scoring_results
+WHERE created_at > '2023-08-08 13:09';
+
+find large files
+sudo find /var -type f -exec du -h {} + | sort -rh | head -n 10
+
+
+
+mongoexport --host=localhost --port=27017 --db=scoring_engine --collection=scores --type=csv --fields="createdDate,evaluationRequest.arguments.customerid,evaluationResponse.results.score,evaluationResponse.results.incomeProxyValue,evaluationResponse.results.eligibleAmount,evaluationResponse.results.exclusionReason,evaluationResponse.results.internalRiskGroup,evaluationResponse.results.ruleInternalScore,evaluationResponse.results.internalRiskGrade,evaluationResponse.results.flagStrategy,evaluationResponse.results.ruleHistoricalDelinquency,evaluationResponse.results.ruleCurrentDeliquency,evaluationResponse.results.exclusionReasonCode,evaluationResponse.results.incomeProxyBand,evaluationResponse.results.finalscore,evaluationResponse.results.ruleCustomerAge,evaluationResponse.results.ruleAgeonMpesa,evaluationResponse.results._target" --query '{"createdDate": {"$gte": "2023-08-25", "$lte": "2023-10-02"}}' --sort='{ "_id": -1 }' --out="scoring_internal_final.csv"
+
+
+
+
+
+
+#!/bin/bash
+
+# Set the current date in the desired format (YYYY-MM-DD)
+current_date=$(date +%F)
+
+# Set the output file name including the directory path
+output_file="/Data/scoring_internal_final_${current_date}.csv"
+
+# MongoDB export command
+mongoexport --host=localhost --port=27017 --db=scoring_engine --collection=scores --type=csv --fields="createdDate,evaluationRequest.arguments.customerid,evaluationResponse.results.score,evaluationResponse.results.incomeProxyValue,evaluationResponse.results.eligibleAmount,evaluationResponse.results.exclusionReason,evaluationResponse.results.internalRiskGroup,evaluationResponse.results.ruleInternalScore,evaluationResponse.results.internalRiskGrade,evaluationResponse.results.flagStrategy,evaluationResponse.results.ruleHistoricalDelinquency,evaluationResponse.results.ruleCurrentDeliquency,evaluationResponse.results.exclusionReasonCode,evaluationResponse.results.incomeProxyBand,evaluationResponse.results.finalscore,evaluationResponse.results.ruleCustomerAge,evaluationResponse.results.ruleAgeonMpesa,evaluationResponse.results._target" --query "{\"createdDate\": {\"\$gte\": \"$current_date\", \"\$lte\": \"$current_date\"}}" --sort='{ "_id": -1 }' --out="$output_file"
+
+# Check the exit status of the mongoexport command
+if [ $? -eq 0 ]; then
+    echo "MongoDB export completed successfully on $current_date."
+else
+    echo "MongoDB export encountered an error on $current_date."
+fi
+
+
+
+
